@@ -20,11 +20,12 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '.onrender.com',
+    'django-bookmyseat-chi.vercel.app',
 ]
 
 if os.environ.get('VERCEL_URL'):
     ALLOWED_HOSTS.append(os.environ.get('VERCEL_URL'))
-
+    
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
