@@ -1,0 +1,50 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*.log
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Django databases
+**/db.sqlite3
+**/db.sqlite3-journal
+
+# Static and media output
+**/staticfiles/
+
+# Secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+__pycache__/
+*.py[cod]
+*.log
+
+venv/
+.venv/
+env/
+
+**/db.sqlite3
+**/db.sqlite3-journal
+
+**/staticfiles/
+
+**/.env
+**/.env.*
+!**/.env.example
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,193 @@
+{% extends "users/basic.html" %} {% block content %}
+<div class="container mt-5">
+  <div class="row">
+    <div class="col-lg-8 mx-auto">
+      <!-- Movie and Theater Info -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center flex-wrap">
+            <div>
+              <h4 class="card-title">{{ theater.movie.name }}</h4>
+              <p class="card-text text-muted">
+                {{ theater.name }} | {{ theater.time }}
+              </p>
+            </div>
+            <div class="mt-2 mt-sm-0">
+              <button class="btn btn-outline-primary me-2 mb-2 mb-sm-0">2D</button>
+              <button class="btn btn-outline-primary me-2 mb-2 mb-sm-0">3D</button>
+              <button class="btn btn-outline-primary mb-2 mb-sm-0">IMAX 3D</button>
+              <button class="btn btn-outline-primary mb-2 mb-sm-0">
+                {{ seats|length }} Tickets
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% if checkout %}
+      <!-- ================= CHECKOUT / PAYMENT ================= -->
+      <div class="card">
+        <div class="card-body text-center">
+          <h5 class="mb-3">Order Summary</h5>
+          <p>
+            Seats:
+            {% for s in seats %}<span class="badge badge-success mr-1">{{ s.seat_number }}</span>{% endfor %}
+          </p>
+          <p>
+            {{ seats|length }} &times; &#8377;{{ theater.price }} =
+            <strong>&#8377;{{ checkout.amount }}</strong>
+          </p>
+          <p class="text-muted small">Your seats are held for 8 minutes.</p>
+
+          {% if checkout.mock %}
+            <div class="alert alert-info small">
+              <strong>Test payment mode.</strong> No real money is charged. Choose an outcome to simulate.
+            </div>
+            <form method="post" action="{% url 'mock_payment' %}">
+              {% csrf_token %}
+              <input type="hidden" name="order_id" value="{{ checkout.order_id }}">
+              <button type="submit" name="action" value="success" class="btn btn-success btn-lg mb-2">Pay &#8377;{{ checkout.amount }} (success)</button>
+              <button type="submit" name="action" value="fail" class="btn btn-danger mb-2">Simulate failure</button>
+              <button type="submit" name="action" value="cancel" class="btn btn-secondary mb-2">Cancel payment</button>
+            </form>
+            <a href="{% url 'book_seats' theater.id %}" class="btn btn-link">Change seats</a>
+          {% else %}
+            <button id="pay-btn" class="btn btn-success btn-lg">Pay &#8377;{{ checkout.amount }}</button>
+            <a href="{% url 'book_seats' theater.id %}" class="btn btn-link">Change seats</a>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if not checkout.mock %}
+      <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+      <script>
+        (function () {
+          var done = false, orderId = '{{ checkout.order_id }}';
+          function post(url, data) {
+            return fetch(url, {
+              method: 'POST', credentials: 'same-origin',
+              headers: {'X-CSRFToken': '{{ csrf_token }}'},
+              body: new URLSearchParams(data)
+            })
+              .then(function (r) { return r.json(); })
+              .then(function (j) { window.location = j.redirect || '{% url "profile" %}'; });
+          }
+          var rzp = new Razorpay({
+            key: '{{ checkout.key }}',
+            amount: '{{ checkout.amount_paise }}',
+            currency: 'INR',
+            name: 'BookMySeat',
+            description: '{{ theater.movie.name|escapejs }}',
+            order_id: orderId,
+            prefill: {
+              name: '{{ request.user.username|escapejs }}',
+              email: '{{ request.user.email|escapejs }}'
+            },
+            theme: {color: '#28a745'},
+            handler: function (r) {
+              done = true;
+              post('{% url "payment_verify" %}', {
+                razorpay_order_id: r.razorpay_order_id,
+                razorpay_payment_id: r.razorpay_payment_id,
+                razorpay_signature: r.razorpay_signature
+              });
+            },
+            modal: {
+              ondismiss: function () {
+                if (!done) { done = true; post('{% url "payment_cancel" %}', {order_id: orderId}); }
+              }
+            }
+          });
+          rzp.on('payment.failed', function (resp) {
+            if (done) return;
+            done = true; rzp.close();
+            post('{% url "payment_failed" %}', {order_id: orderId, reason: resp.error.description});
+          });
+          document.getElementById('pay-btn').onclick = function (e) { e.preventDefault(); rzp.open(); };
+        })();
+      </script>
+      {% endif %}
+
+      {% else %}
+      <!-- ================= SEAT SELECTION ================= -->
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title text-center mb-4">Select Your Seats</h5>
+          <div class="screen">All eyes this way please!</div>
+
+          <form method="POST">
+            {% csrf_token %}
+            {% if error %}
+              <div class="alert alert-danger">{{ error }}</div>
+            {% endif %}
+            <div id="seat-grid" class="d-flex justify-content-center flex-wrap mb-4">
+              {% for seat in seats %}
+                {% if seat.is_booked %}
+                  <div class="seat sold" title="Booked">{{ seat.seat_number }}</div>
+                {% elif seat.is_currently_reserved and seat.reserved_by_id != request.user.id %}
+                  <div class="seat reserved" title="Reserved by another user">{{ seat.seat_number }}</div>
+                {% else %}
+                  <div class="seat available">
+                    <input
+                      type="checkbox"
+                      name="seats"
+                      value="{{ seat.id }}"
+                      class="d-none"
+                      id="seat-{{ seat.id }}"
+                      {% if seat.reserved_by_id == request.user.id and seat.is_currently_reserved %}checked{% endif %}
+                    />
+                    <label
+                      for="seat-{{ seat.id }}"
+                      class="w-100 h-100 d-flex align-items-center justify-content-center"
+                    >{{ seat.seat_number }}</label>
+                  </div>
+                {% endif %}
+              {% endfor %}
+            </div>
+
+            <!-- Seat Legend -->
+            <div class="d-flex justify-content-center mb-4">
+              <div class="d-flex align-items-center me-4">
+                <div class="seat" style="background-color: white"></div>
+                <span class="ms-2">Available</span>
+              </div>
+              <div class="d-flex align-items-center me-4">
+                <div class="seat selected"></div>
+                <span class="ms-2">Selected</span>
+              </div>
+              <div class="d-flex align-items-center">
+                <div class="seat sold"></div>
+                <span class="ms-2">Sold</span>
+              </div>
+            </div>
+
+            <div class="text-center">
+              <button type="submit" class="btn btn-success btn-lg">
+                Proceed to Payment
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<style>
+  body { font-family: Arial, sans-serif; }
+  .seat {
+    width: 30px; height: 30px; border: 1px solid #28a745; margin: 3px;
+    text-align: center; line-height: 30px; cursor: pointer; border-radius: 5px;
+    transition: background-color 0.3s, color 0.3s;
+  }
+  .seat:hover { background-color: #28a745; color: white; }
+  .seat.selected { background-color: #28a745; color: white; }
+  .screen {
+    margin: 20px 0; background-color: #ccc; height: 50px;
+    text-align: center; line-height: 50px; color: #666;
+  }
+  .seat.reserved { background-color: #ffc107; border-color: #e0a800; color: #212529; cursor: not-allowed; }
+  .seat.sold { background-color: #dc3545; border-color: #dc3545; color: white; cursor: not-allowed; }
+  .seat.available input:checked + label { background-color: #28a745; color: white; border-radius: 5px; }
+</style>
+{% endblock %}

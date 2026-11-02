@@ -1,0 +1,159 @@
+{% extends "users/basic.html" %} {% block content %}
+
+<div class="container py-5">
+  <div class="row">
+    <div class="col-lg-4 mb-4">
+      <!-- User Info Card -->
+      <div class="card shadow">
+        <div class="card-body text-center">
+          <div class="mb-3">
+            <i class="fas fa-user-circle fa-6x text-primary"></i>
+          </div>
+          <h3 class="card-title mb-0">{{ user.username }}</h3>
+          <p class="text-muted mb-3">{{ user.email }}</p>
+          <div class="d-flex justify-content-center">
+            <a href="#" class="btn btn-outline-primary me-2"><i class="fas fa-envelope me-2"></i>Message</a>
+            <a href="{% url 'password_reset' %}" class="btn btn-outline-secondary"><i class="fas fa-key me-2"></i>Reset Password</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <!-- Profile Update Form Card -->
+      <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+          <h4 class="mb-0"><i class="fas fa-user-edit me-2"></i> Update Profile</h4>
+        </div>
+        <div class="card-body">
+          <form method="POST">
+            {% csrf_token %}
+            {% for field in u_form %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label">
+                  <i class="fas fa-{% if field.name == 'username' %}user{% elif field.name == 'email' %}envelope{% else %}info-circle{% endif %} me-2"></i>
+                  {{ field.label }}
+                </label>
+                {{ field.errors }}
+                {{ field }}
+                {% if field.help_text %}
+                  <small class="form-text text-muted">{{ field.help_text }}</small>
+                {% endif %}
+              </div>
+            {% endfor %}
+            <button class="btn btn-primary w-100" type="submit"><i class="fas fa-save me-2"></i> Update Profile</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Bookings Card -->
+      <div class="card shadow mb-4">
+        <div class="card-header bg-success text-white">
+          <h4 class="mb-0"><i class="fas fa-ticket-alt me-2"></i> Your Bookings</h4>
+        </div>
+        <div class="card-body">
+          {% for booking in bookings %}
+            <div class="border-bottom py-2">
+              <strong>{{ booking.movie.name }}</strong>
+              <span class="badge badge-{% if booking.status == 'confirmed' %}success{% else %}secondary{% endif %}">{{ booking.get_status_display }}</span><br>
+              <small class="text-muted">
+                {{ booking.theater.name }} &middot; Seat {{ booking.seat.seat_number }} &middot;
+                &#8377;{{ booking.amount }} &middot; {{ booking.booked_at|date:"d M Y H:i" }}
+              </small>
+              {% if booking.payment_id and booking.status == 'confirmed' %}
+                <a class="btn btn-sm btn-outline-primary float-right" href="{% url 'ticket_download' booking.payment_id %}">Download ticket</a>
+              {% endif %}
+            </div>
+          {% empty %}
+            <div class="text-center py-5">
+              <i class="fas fa-ticket-alt fa-4x text-muted mb-3"></i>
+              <p class="lead mb-0">No bookings yet. Time to plan your next movie night!</p>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Payment History Card -->
+      <div class="card shadow">
+        <div class="card-header bg-dark text-white">
+          <h4 class="mb-0"><i class="fas fa-receipt me-2"></i> Payment History</h4>
+        </div>
+        <div class="card-body">
+          {% for p in payments %}
+            <div class="border-bottom py-2">
+              <strong>{{ p.booking_ref }}</strong> &middot; {{ p.theater.movie.name }}
+              <span class="badge badge-{% if p.status == 'success' %}success{% elif p.status == 'created' %}info{% elif p.status == 'refunded' or p.status == 'refund_pending' %}warning{% else %}danger{% endif %}">{{ p.get_status_display }}</span><br>
+              <small class="text-muted">
+                &#8377;{{ p.amount }} &middot; {{ p.created_at|date:"d M Y H:i" }}
+                &middot; Txn: {{ p.razorpay_payment_id|default:"-" }}
+                &middot; Seats:
+                {% if p.status == 'success' %}{% for b in p.bookings.all %}{{ b.seat.seat_number }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}{{ p.seat_id_list|length }}{% endif %}
+                {% if p.failure_reason %}&middot; {{ p.failure_reason }}{% endif %}
+              </small>
+              <div class="mt-1">
+                {% if p.status == 'success' %}
+                  <a class="btn btn-sm btn-outline-primary" href="{% url 'ticket_download' p.id %}">Download ticket</a>
+                {% elif p.status == 'failed' or p.status == 'cancelled' %}
+                  <form method="post" action="{% url 'payment_retry' p.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-warning" type="submit">Retry payment</button>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+          {% empty %}
+            <p class="text-center text-muted py-4 mb-0">No payments yet.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Font Awesome CDN -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+<!-- Custom CSS -->
+<style>
+  body {
+    background-color: #f8f9fa;
+  }
+  .card {
+    border-radius: 15px;
+    border: none;
+    transition: transform 0.3s ease-in-out;
+  }
+  .card:hover {
+    transform: translateY(-5px);
+  }
+  .card-header {
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+  }
+  /* Style form fields */
+  form input, form select, form textarea {
+    display: block;
+    width: 100%;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #212529;
+    background-color: #fff;
+    background-clip: padding-box;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  }
+  form input:focus, form select:focus, form textarea:focus {
+    border-color: #86b7fe;
+    outline: 0;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+  }
+  @media (max-width: 767.98px) {
+    .card-body {
+      padding: 1rem;
+    }
+  }
+</style>
+{% endblock %}

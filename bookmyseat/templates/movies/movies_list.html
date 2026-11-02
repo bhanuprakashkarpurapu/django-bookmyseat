@@ -1,0 +1,384 @@
+{% extends "users/basic.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <h1 class="text-center mb-5">Movies</h1>
+
+    <!-- Trending Movies Section -->
+    {% if trending_movies %}
+    <div class="mb-5">
+        <h3 class="font-weight-bold mb-3"><i class="fas fa-fire text-danger"></i> Trending Now</h3>
+        <div class="row">
+            {% for trend in trending_movies %}
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card h-100 shadow-sm border-danger">
+                    <img src="{{ trend.image.url }}" class="card-img-top" alt="{{ trend.name }}" style="height: 180px; object-fit: cover;">
+                    <div class="card-body p-2 text-center">
+                        <h6 class="card-title font-weight-bold mb-1 text-truncate">{{ trend.name }}</h6>
+                        <small class="text-warning"><i class="fas fa-star"></i> {{ trend.average_rating }}/5</small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recommended for You -->
+    {% if recommended %}
+    <div class="mb-5">
+        <h3 class="font-weight-bold mb-3"><i class="fas fa-thumbs-up text-primary"></i> Recommended for You</h3>
+        <div class="row">
+            {% for m in recommended %}
+            <div class="col-md-2 col-4 mb-3">
+                <a href="{% url 'theater_list' m.id %}" class="text-dark text-decoration-none">
+                    <div class="card h-100 shadow-sm">
+                        <img src="{{ m.image.url }}" class="card-img-top" alt="{{ m.name }}" style="height:150px;object-fit:cover;">
+                        <div class="card-body p-2 text-center"><small class="font-weight-bold">{{ m.name }}</small></div>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Search + Filters -->
+    <form method="GET" id="filterForm" action="{% url 'movie_list' %}" class="mb-4">
+        <div class="input-group mb-3">
+            <input class="form-control form-control-lg" name="search" placeholder="Search movies by title" value="{{ f.search }}">
+            <div class="input-group-append">
+                <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> Search</button>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="col-md-3 mb-2">
+                <select name="genre" class="form-control">
+                    <option value="">All genres</option>
+                    {% for g in genres %}<option value="{{ g.id }}" {% if f.genre == g.id|stringformat:'s' %}selected{% endif %}>{{ g.name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 mb-2">
+                <select name="language" class="form-control">
+                    <option value="">All languages</option>
+                    {% for l in languages %}<option value="{{ l.id }}" {% if f.language == l.id|stringformat:'s' %}selected{% endif %}>{{ l.name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 mb-2">
+                <select name="city" class="form-control">
+                    <option value="">All cities</option>
+                    {% for c in cities %}<option value="{{ c }}" {% if f.city == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 mb-2">
+                <select name="theater" class="form-control">
+                    <option value="">All theaters</option>
+                    {% for t in theater_names %}<option value="{{ t }}" {% if f.theater == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 mb-2">
+                <select name="timing" class="form-control">
+                    <option value="">Any show time</option>
+                    <option value="morning" {% if f.timing == 'morning' %}selected{% endif %}>Morning (5am-12pm)</option>
+                    <option value="afternoon" {% if f.timing == 'afternoon' %}selected{% endif %}>Afternoon (12-4pm)</option>
+                    <option value="evening" {% if f.timing == 'evening' %}selected{% endif %}>Evening (4-8pm)</option>
+                    <option value="night" {% if f.timing == 'night' %}selected{% endif %}>Night (8pm+)</option>
+                </select>
+            </div>
+            <div class="col-md-3 mb-2">
+                <select name="min_rating" class="form-control">
+                    <option value="">Any rating</option>
+                    {% for r in "5678" %}<option value="{{ r }}" {% if f.min_rating == r %}selected{% endif %}>{{ r }}+</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 mb-2"><input type="date" name="release_from" class="form-control" title="Released from" value="{{ f.release_from }}"></div>
+            <div class="col-md-3 mb-2"><input type="date" name="release_to" class="form-control" title="Released until" value="{{ f.release_to }}"></div>
+            <div class="col-md-3 mb-2"><input type="date" name="show_date" class="form-control" title="Show date" value="{{ f.show_date }}"></div>
+            <div class="col-md-3 mb-2">
+                <select name="sort" class="form-control">
+                    <option value="popularity" {% if f.sort == 'popularity' or not f.sort %}selected{% endif %}>Sort: Popularity</option>
+                    <option value="newest" {% if f.sort == 'newest' %}selected{% endif %}>Sort: Newest</option>
+                    <option value="rating" {% if f.sort == 'rating' %}selected{% endif %}>Sort: Rating</option>
+                    <option value="price_low" {% if f.sort == 'price_low' %}selected{% endif %}>Sort: Price low to high</option>
+                    <option value="price_high" {% if f.sort == 'price_high' %}selected{% endif %}>Sort: Price high to low</option>
+                </select>
+            </div>
+            <div class="col-md-3 mb-2"><a href="{% url 'movie_list' %}" class="btn btn-outline-secondary btn-block">Clear filters</a></div>
+        </div>
+        <p class="mb-0"><strong>{{ total }}</strong> movie{{ total|pluralize }} found</p>
+    </form>
+
+    <!-- Movie Cards Grid -->
+    <div class="row" id="movieList">
+        {% for movie in movies %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm position-relative">
+
+                <!-- Age Certification Badge -->
+                <span class="badge badge-dark position-absolute p-2" style="top: 10px; right: 10px; z-index: 10; opacity: 0.9;">
+                    {{ movie.age_certification }}
+                </span>
+
+                <img src="{{ movie.image.url }}" class="card-img-top" alt="{{ movie.name }}" style="height: 320px; object-fit: cover;">
+
+                <div class="card-body">
+                    <h5 class="card-title font-weight-bold">{{ movie.name }}</h5>
+
+                    <!-- Rating & Genres -->
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <p class="card-text mb-0">
+                            <i class="fas fa-star text-warning"></i> <strong>{{ movie.average_rating }}</strong> / 5
+                        </p>
+                        <div>
+                            {% for genre in movie.genres.all %}
+                                <span class="badge badge-light border">{{ genre.name }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    {% if movie.min_price %}<p class="mb-1"><small>Tickets from &#8377;{{ movie.min_price }}</small></p>{% endif %}
+
+                    <p class="card-text">
+                        <small class="text-muted">
+                            <i class="fas fa-users"></i> <strong>Cast:</strong> {{ movie.cast }}
+                        </small>
+                    </p>
+                </div>
+
+                <!-- Card Actions -->
+                <div class="card-footer bg-white border-top-0 d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-info btn-sm flex-fill mr-1" data-toggle="modal" data-target="#movieModal{{ movie.id }}">
+                        <i class="fas fa-play-circle"></i> Trailer & Details
+                    </button>
+                    <a href="{% url 'theater_list' movie.id %}" class="btn btn-primary btn-sm flex-fill ml-1">
+                        <i class="fas fa-ticket-alt"></i> Book Seats
+                    </a>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ==================== MOVIE DETAIL MODAL ==================== -->
+        <div class="modal fade" id="movieModal{{ movie.id }}" tabindex="-1" role="dialog" aria-labelledby="movieModalLabel{{ movie.id }}" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+                <div class="modal-content">
+
+                    <div class="modal-header">
+                        <h5 class="modal-title font-weight-bold" id="movieModalLabel{{ movie.id }}">
+                            {{ movie.name }}
+                            <span class="badge badge-secondary ml-2">{{ movie.age_certification }}</span>
+                        </h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+
+                    <div class="modal-body">
+
+                        <!-- Embedded YouTube Trailer -->
+                        {% if movie.youtube_trailer_id %}
+                        <div class="embed-responsive embed-responsive-16by9 mb-4 rounded shadow-sm">
+                            <iframe
+                                class="embed-responsive-item"
+                                src="https://www.youtube-nocookie.com/embed/{{ movie.youtube_trailer_id }}"
+                                allowfullscreen>
+                            </iframe>
+                        </div>
+                        {% endif %}
+
+                        <!-- Movie Details -->
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <h6 class="font-weight-bold">Overview</h6>
+                                <p class="text-muted">{{ movie.description|default:"No description available." }}</p>
+                                <p><strong>Cast:</strong> {{ movie.cast }}</p>
+                            </div>
+                            <div class="col-md-4 border-left">
+                                <p><strong>Duration:</strong> {{ movie.duration_minutes }} mins</p>
+                                <p><strong>Rating:</strong> <i class="fas fa-star text-warning"></i> {{ movie.average_rating }} / 5</p>
+                                <p>
+                                    <strong>Languages:</strong>
+                                    {% for lang in movie.languages.all %}
+                                        <span class="badge badge-info">{{ lang.name }}</span>
+                                    {% empty %}
+                                        <span class="text-muted">Standard</span>
+                                    {% endfor %}
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Extra Posters Gallery -->
+                        {% if movie.extra_posters.all %}
+                        <h6 class="font-weight-bold mb-2">Gallery / Posters</h6>
+                        <div class="d-flex flex-row overflow-auto mb-4" style="gap: 10px;">
+                            {% for poster in movie.extra_posters.all %}
+                                <img src="{{ poster.image.url }}" alt="Poster" class="rounded border" style="height: 120px; object-fit: cover;">
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <hr>
+
+                        <!-- User Reviews Section -->
+                        <h6 class="font-weight-bold mb-3">Reviews & Ratings</h6>
+                        <div class="reviews-list mb-3" style="max-height: 200px; overflow-y: auto;">
+                            {% for review in movie.reviews.all %}
+                                <div class="border-bottom pb-2 mb-2">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <strong>
+                                            <i class="fas fa-user-circle"></i> {{ review.user.username }}
+                                            {% if review.is_verified_viewer %}
+                                                <span class="badge badge-success" title="Verified Ticket Buyer">
+                                                    <i class="fas fa-check-circle"></i> Verified Buyer
+                                                </span>
+                                            {% endif %}
+                                        </strong>
+
+                                        <div class="d-flex align-items-center">
+                                            <small class="text-warning mr-2">
+                                                <i class="fas fa-star"></i> {{ review.rating }}/5
+                                            </small>
+
+                                            <!-- Report Flag Button -->
+                                            {% if user.is_authenticated and review.user != user %}
+                                                <a href="{% url 'report_review' review.id %}" class="text-danger small ml-2" title="Report inappropriate content" onclick="return confirm('Report this review to admin?');">
+                                                    <i class="fas fa-flag"></i>
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <p class="mb-0 text-muted small">{{ review.comment }}</p>
+                                </div>
+                            {% empty %}
+                                <p class="text-muted small">No reviews submitted yet for this movie.</p>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Review Form inside Modal -->
+                        {% if user.is_authenticated %}
+                            <div class="card bg-light mb-3 p-3 border-0">
+                                <h6 class="card-title font-weight-bold text-secondary mb-2">Leave a Review</h6>
+                                <form method="POST" action="{% url 'add_review' movie.id %}">
+                                    {% csrf_token %}
+                                    <div class="form-row">
+                                        <div class="form-group col-md-4">
+                                            <label for="ratingSelect">Rating</label>
+                                            <select name="rating" class="form-control" required>
+                                                <option value="5">⭐⭐⭐⭐⭐ (5/5)</option>
+                                                <option value="4">⭐⭐⭐⭐ (4/5)</option>
+                                                <option value="3">⭐⭐⭐ (3/5)</option>
+                                                <option value="2">⭐⭐ (2/5)</option>
+                                                <option value="1">⭐ (1/5)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group col-md-8">
+                                            <label for="commentInput">Your Review</label>
+                                            <input type="text" name="comment" class="form-control" placeholder="Write your thoughts..." required>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-sm btn-success">
+                                        <i class="fas fa-paper-plane"></i> Submit Review
+                                    </button>
+                                </form>
+                            </div>
+                        {% else %}
+                            <p class="text-muted small"><a href="{% url 'login' %}">Log in</a> to post a review.</p>
+                        {% endif %}
+
+                        <hr>
+                        <!-- Similar Movies -->
+                        <h6 class="font-weight-bold mb-3"><i class="fas fa-film text-info"></i> More Like This</h6>
+                        <div class="d-flex flex-row overflow-auto pb-2" style="gap: 15px;">
+                            {% for genre in movie.genres.all %}
+                                {% for sim_movie in genre.movies.all %}
+                                    {% if sim_movie.id != movie.id %}
+                                    <div class="border rounded p-2 text-center" style="min-width: 120px; max-width: 130px;">
+                                        <img src="{{ sim_movie.image.url }}" alt="{{ sim_movie.name }}" class="rounded mb-2" style="width: 100%; height: 120px; object-fit: cover;">
+                                        <p class="small font-weight-bold mb-0 text-truncate">{{ sim_movie.name }}</p>
+                                        <small class="text-warning"><i class="fas fa-star"></i> {{ sim_movie.average_rating }}</small>
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            {% empty %}
+                                <p class="text-muted small">No similar movie recommendations found.</p>
+                            {% endfor %}
+                        </div>
+
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <a href="{% url 'theater_list' movie.id %}" class="btn btn-primary">
+                            <i class="fas fa-ticket-alt"></i> Proceed to Book Seats
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        <!-- ==================== END MODAL ==================== -->
+
+        {% empty %}
+        <div class="col-12 text-center">
+            <p class="lead text-muted">No movies found. Try different filters or a different search term.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if movies.has_other_pages %}
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if movies.has_previous %}
+                <li class="page-item"><a class="page-link" href="?{{ qs }}&page={{ movies.previous_page_number }}">Previous</a></li>
+            {% endif %}
+            <li class="page-item disabled"><span class="page-link">Page {{ movies.number }} of {{ movies.paginator.num_pages }}</span></li>
+            {% if movies.has_next %}
+                <li class="page-item"><a class="page-link" href="?{{ qs }}&page={{ movies.next_page_number }}">Next</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<!-- Bootstrap JS & Dependencies -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+
+<style>
+    .card {
+        transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+    }
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.12) !important;
+    }
+</style>
+
+<script>
+    $(document).ready(function() {
+        // Stop YouTube video playback when modal is closed
+        $('.modal').on('hidden.bs.modal', function () {
+            var $iframe = $(this).find('iframe');
+            if ($iframe.length) {
+                var src = $iframe.attr('src');
+                $iframe.attr('src', '');
+                $iframe.attr('src', src);
+            }
+        });
+
+        // Apply filters as soon as one changes
+        $('#filterForm select, #filterForm input[type=date]').on('change', function () {
+            this.form.submit();
+        });
+
+        // Record "recently viewed" when a details modal opens (feeds recommendations)
+        $('.modal').on('show.bs.modal', function () {
+            var id = this.id.replace('movieModal', '');
+            fetch('/movies/' + id + '/?track=1', {credentials: 'same-origin'});
+        });
+    });
+</script>
+{% endblock %}
